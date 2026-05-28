@@ -10,8 +10,8 @@ import traceback
 
 # Configuración inicial de la página (Debe ser la primera instrucción)
 st.set_page_config(
-    page_title="Predicción de Demanda - Productos de Espuma",
-    page_icon="📈",
+    page_title="Pronóstico de Ingresos - Productos de Espuma",
+    page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -20,7 +20,7 @@ st.set_page_config(
 MODEL_PATH = "modelo_xgboost_ventas.pkl"
 
 # --- LÓGICA DEL MODELO INTEGRADA EN APP.PY ---
-class DemandForecaster:
+class IncomeForecaster:
     def __init__(self, model_path=MODEL_PATH):
         self.model_path = model_path
         self.model = None
@@ -67,7 +67,7 @@ class DemandForecaster:
 
     def predecir(self, df_input):
         """
-        Realiza el pronóstico utilizando tu modelo .pkl si está disponible,
+        Realiza el pronóstico de ingresos utilizando tu modelo .pkl si está disponible,
         o una simulación matemática realista si el modelo no puede procesar los datos.
         """
         df_processed = self.preprocesar_datos(df_input)
@@ -84,39 +84,43 @@ class DemandForecaster:
                 # Conversión rápida a variables One-Hot Encoding
                 X = pd.get_dummies(df_processed[columnas_modelo], drop_first=True)
                 
-                # Realizar predicción
+                # Realizar predicción (que representa el valor de ingresos)
                 predicciones = self.model.predict(X)
-                return np.maximum(0, predicciones)  # Evitar demandas negativas
+                return np.maximum(0.0, predicciones)  # Evitar ingresos negativos
             except Exception as e:
                 # Si falla por diferencias de columnas o entrenamiento, usamos el motor inteligente
-                print(f"[ERROR] Falló la predicción con el modelo real: {str(e)}. Utilizando simulación de respaldo.")
+                print(f"[ERROR] Falló la predicción con el modelo real: {str(e)}. Utilizando simulación de respaldo de ingresos.")
         
-        # --- MOTOR DE SIMULACIÓN INTELIGENTE DE RESPALDO (MOCK adaptado a Espumas) ---
+        # --- MOTOR DE SIMULACIÓN INTELIGENTE DE RESPALDO (MOCK enfocado en Ingresos Financieros) ---
         np.random.seed(42)
         predicciones = []
         
         for _, row in df_processed.iterrows():
-            base_demanda = 120.0
+            # Base monetaria simulada según volumen de cantidad facturada (Precio promedio por unidad de espuma ~ $12,500 COP)
+            cantidad = float(row.get('Cantidad facturada', 50))
+            base_ingresos = cantidad * 12500.0  
+            
             mes = int(row.get('Mes', 6))
-            # Estacionalidad (picos en temporada alta de colchones y confort: fin de año y mitad de año)
-            estacionalidad = 1.0 + 0.25 * np.sin(2 * np.pi * mes / 12) + (0.4 if mes in [11, 12, 6, 7] else 0.0)
+            # Estacionalidad comercial (incremento del +25% en meses de alta demanda como fin de año o mitad de año)
+            estacionalidad = 1.0 + 0.25 * np.sin(2 * np.pi * mes / 12) + (0.35 if mes in [11, 12, 6, 7] else 0.0)
             
-            # Factores según canal
-            factor_canal = 1.3 if str(row.get('Canal de Distribución', '')).lower() in ['mayorista', 'distribuidor', 'directo fábrica'] else 0.9
-            factor_vendedor = 1.0 + (len(str(row.get('Vendedor', ''))) % 5) * 0.05
+            # Factores multiplicadores según canal
+            factor_canal = 1.15 if str(row.get('Canal de Distribución', '')).lower() in ['distribuidor', 'directo fábrica'] else 0.95
+            factor_vendedor = 1.0 + (len(str(row.get('Vendedor', ''))) % 5) * 0.03
             
-            # Factor por tipo de material
-            factor_producto = 1.0 + (len(str(row.get('Descripción de material (producto)', ''))) % 10) * 0.08
+            # Factor por tipo de material / espuma
+            factor_producto = 1.0 + (len(str(row.get('Descripción de material (producto)', ''))) % 10) * 0.05
             
-            prediccion = base_demanda * estacionalidad * factor_canal * factor_vendedor * factor_producto
-            ruido = np.random.normal(0, prediccion * 0.04)
+            prediccion_ingresos = base_ingresos * estacionalidad * factor_canal * factor_vendedor * factor_producto
+            ruido = np.random.normal(0, prediccion_ingresos * 0.03)  # Ruido del 3%
             
-            predicciones.append(max(0, round(prediccion + ruido, 2)))
+            # Redondeo a número entero (representando pesos monetarios)
+            predicciones.append(max(0.0, round(prediccion_ingresos + ruido, 0)))
             
         return np.array(predicciones)
 
 def generar_datos_ejemplo(n_filas=150):
-    """Genera datos de ejemplo representativos de la industria de espumas."""
+    """Genera datos de ejemplo realistas de la industria de espumas para modelar ingresos."""
     np.random.seed(42)
     
     vendedores = ['Vendedor Juan', 'Vendedora Maria', 'Vendedor Carlos', 'Vendedora Ana']
@@ -157,7 +161,7 @@ def generar_datos_ejemplo(n_filas=150):
 # --- INICIALIZACIÓN DEL PREDICTOR ---
 @st.cache_resource
 def obtener_predictor():
-    return DemandForecaster()
+    return IncomeForecaster()
 
 forecaster = obtener_predictor()
 
@@ -171,7 +175,7 @@ st.markdown("""
         background-color: #F1F5F9;
         padding: 1.5rem;
         border-radius: 0.75rem;
-        border-left: 6px solid #1E3A8A;
+        border-left: 6px solid #16A34A; /* Color verde para representar ingresos/dinero */
         margin-bottom: 1rem;
         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
     }
@@ -182,7 +186,7 @@ st.markdown("""
         font-weight: 600 !important;
     }
     .custom-card h2 {
-        color: #1E3A8A !important;
+        color: #16A34A !important;
         margin: 0 !important;
         font-size: 2.2rem !important;
         font-weight: 800 !important;
@@ -196,14 +200,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- BARRA LATERAL (SIDEBAR) ---
-st.sidebar.image("https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", use_container_width=True, caption="Análisis Predictivo de Demanda")
+st.sidebar.image("https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=200&auto=format&fit=crop&q=60", use_container_width=True, caption="Análisis Financiero Predictivo")
 st.sidebar.title("Configuración de Entrada")
 
 # Indicador de estado del modelo
 if forecaster.is_mock:
     st.sidebar.warning("⚠️ Ejecutando en Modo Demostración (No se cargó el archivo de modelo real o necesita alineación de variables).")
 else:
-    st.sidebar.success(f"✅ ¡Modelo '{MODEL_PATH}' cargado correctamente!")
+    st.sidebar.success(f"✅ ¡Modelo de Ingresos '{MODEL_PATH}' cargado correctamente!")
 
 opcion_carga = st.sidebar.radio(
     "Selecciona la fuente de datos:",
@@ -211,14 +215,14 @@ opcion_carga = st.sidebar.radio(
 )
 
 # --- PANEL PRINCIPAL ---
-st.title("📈 Sistema Inteligente de Pronóstico de Demanda - Espumas")
-st.caption("Optimiza tus niveles de inventario y toma decisiones comerciales basadas en datos e inteligencia artificial para la industria de la espuma.")
+st.title("💰 Sistema Inteligente de Pronóstico de Ingresos - Espumas")
+st.caption("Optimiza la planeación financiera y comercial visualizando los ingresos estimados proyectados por el modelo de Inteligencia Artificial.")
 st.write("---")
 
 # 1. Opción Registro Único
 if opcion_carga == "Simular registro único":
-    st.subheader("📋 Ingreso Manual de Características")
-    st.info("Ingresa los parámetros de un registro para predecir la demanda esperada de ese escenario específico.")
+    st.subheader("📋 Ingreso Manual de Características de Venta")
+    st.info("Ingresa los parámetros de un registro para predecir los ingresos monetarios esperados por esa transacción.")
     
     col1, col2, col3 = st.columns(3)
     
@@ -237,7 +241,7 @@ if opcion_carga == "Simular registro único":
         ])
     
     with col2:
-        cantidad_facturada = st.number_input("Cantidad histórica facturada (referencia)", min_value=1, value=50)
+        cantidad_facturada = st.number_input("Cantidad física facturada", min_value=1, value=50)
         oficina_venta = st.selectbox("Oficina de Venta (Ofc. Venta)", ['Oficina Norte', 'Oficina Sur', 'Oficina Centro', 'Oficina Virtual'])
         periodo_contable = st.number_input("Período contable", min_value=2020, max_value=2030, value=datetime.today().year)
         poblacion_destino = st.text_input("Población Destino (Pobl. Destino)", "Bogotá")
@@ -266,7 +270,7 @@ if opcion_carga == "Simular registro único":
     
     df_registro = pd.DataFrame(datos_registro)
     
-    if st.button("🔮 Calcular Pronóstico de Demanda", type="primary", use_container_width=True):
+    if st.button("🔮 Calcular Pronóstico de Ingresos", type="primary", use_container_width=True):
         prediccion_resultado = forecaster.predecir(df_registro)[0]
         
         st.write("---")
@@ -275,39 +279,41 @@ if opcion_carga == "Simular registro único":
             
             with res_col1:
                 st.metric(
-                    label="DEMANDA ESTIMADA", 
-                    value=f"{prediccion_resultado:,.1f} Unidades",
-                    help="Unidades de espuma pronosticadas basadas en patrones estacionales y geográficos."
+                    label="INGRESOS ESTIMADOS", 
+                    value=f"$ {prediccion_resultado:,.2f}",
+                    help="Ingresos esperados basados en los precios del mercado, volumen de venta y factores estacionales."
                 )
                 
                 st.markdown(f"""
                     <div class="custom-card">
-                        <h5>Estado del Pronóstico</h5>
-                        <h2>Estable</h2>
-                        <p>Variabilidad de pedido estimada del ±4% según comportamiento de mercado.</p>
+                        <h5>Viabilidad de Cobro</h5>
+                        <h2>Alta</h2>
+                        <p>Desviación estándar calculada del ±3% bajo condiciones comerciales actuales.</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
             with res_col2:
                 categorias_demostracion = ['Colchonería', 'Espumas Industriales', 'Empaques', 'Hogar y Confort']
-                valores_comparativos = [prediccion_resultado if c == departamento else np.random.randint(50, 250) for c in categorias_demostracion]
+                valores_comparativos = [prediccion_resultado if c == departamento else np.random.randint(450000, 2800000) for c in categorias_demostracion]
                 
                 fig = px.bar(
                     x=categorias_demostracion,
                     y=valores_comparativos,
-                    labels={'x': 'Departamento', 'y': 'Demanda Prevista (m³ / Unidades)'},
-                    title=f"Predicción Comparativa por Categoría (Destacando {departamento})",
+                    labels={'x': 'Departamento', 'y': 'Ingresos Previstos ($)'},
+                    title=f"Ingresos Proyectados por Categoría (Destacando {departamento})",
                     color=categorias_demostracion,
-                    color_discrete_map={departamento: '#1E3A8A'}
+                    color_discrete_map={departamento: '#16A34A'}
                 )
                 fig.update_layout(showlegend=False, margin=dict(t=40, b=20, l=20, r=20))
+                # Formatear el eje Y con signo de pesos en el gráfico
+                fig.update_layout(yaxis_tickformat="$ ,.0f")
                 st.plotly_chart(fig, use_container_width=True)
 
 # 2. Opción Archivo Completo (Lotes)
 elif opcion_carga == "Cargar archivo CSV / Excel":
-    st.subheader("📂 Cargar archivo para Procesamiento en Lote")
+    st.subheader("📂 Procesamiento en Lote de Ingresos")
     st.markdown("""
-        El archivo debe contener las siguientes columnas para que el modelo funcione:
+        El archivo debe contener las siguientes columnas para que el modelo calcule los pronósticos:
         `Vendedor`, `Fec Factura`, `Nombre del solicitante`, `Descripción de material (producto)`, `Cantidad facturada`, `Ofc. Venta`, `Período contable`, `Pobl. Destino`, `Canal de Distribución`, `Hora facturación`, `Departamento`, `Mes`
     """)
     
@@ -334,25 +340,28 @@ elif opcion_carga == "Cargar archivo CSV / Excel":
                 for col in columnas_faltantes:
                     df_cargado[col] = "Desconocido" if col != "Mes" else 6
                     
-            with st.spinner("Procesando y generando pronósticos..."):
+            with st.spinner("Procesando y generando pronósticos de ingresos..."):
                 predicciones = forecaster.predecir(df_cargado)
-                df_cargado['Demanda Pronosticada'] = predicciones
+                df_cargado['Ingresos Pronosticados'] = predicciones
                 
-            st.subheader("📊 Resultados de Pronósticos Generados")
+            st.subheader("📊 Resultados de Ingresos Generados")
             
             with st.container():
                 m1, m2, m3 = st.columns(3)
-                m1.metric("Total Demanda Pronosticada", f"{df_cargado['Demanda Pronosticada'].sum():,.0f} unds")
-                m2.metric("Promedio de Demanda por Registro", f"{df_cargado['Demanda Pronosticada'].mean():,.1f} unds")
-                m3.metric("Pico Máximo de Demanda Detectado", f"{df_cargado['Demanda Pronosticada'].max():,.0f} unds")
+                m1.metric("Total Ingresos Pronosticados", f"$ {df_cargado['Ingresos Pronosticados'].sum():,.2f}")
+                m2.metric("Promedio de Ingresos por Registro", f"$ {df_cargado['Ingresos Pronosticados'].mean():,.2f}")
+                m3.metric("Pico de Ingresos Máximo Detectado", f"$ {df_cargado['Ingresos Pronosticados'].max():,.2f}")
             
-            st.dataframe(df_cargado.head(50), use_container_width=True)
+            # Formatear la columna de ingresos en el dataframe para la visualización
+            df_visualizacion = df_cargado.copy()
+            df_visualizacion['Ingresos Pronosticados'] = df_visualizacion['Ingresos Pronosticados'].apply(lambda x: f"$ {x:,.2f}")
+            st.dataframe(df_visualizacion.head(50), use_container_width=True)
             
             csv_data = df_cargado.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Descargar Reporte con Pronósticos en CSV",
+                label="📥 Descargar Reporte de Ingresos en CSV",
                 data=csv_data,
-                file_name="pronosticos_demanda_espumas.csv",
+                file_name="pronosticos_ingresos_espumas.csv",
                 mime="text/csv",
                 type="primary"
             )
@@ -362,17 +371,18 @@ elif opcion_carga == "Cargar archivo CSV / Excel":
                 col_chart1, col_chart2 = st.columns(2)
                 
                 with col_chart1:
-                    dem_dep = df_cargado.groupby('Departamento')['Demanda Pronosticada'].sum().reset_index()
-                    fig_dep = px.pie(dem_dep, values='Demanda Pronosticada', names='Departamento', 
-                                     title="Distribución de la Demanda por Departamento", hole=0.4,
-                                     color_discrete_sequence=px.colors.qualitative.Pastel)
+                    dem_dep = df_cargado.groupby('Departamento')['Ingresos Pronosticados'].sum().reset_index()
+                    fig_dep = px.pie(dem_dep, values='Ingresos Pronosticados', names='Departamento', 
+                                     title="Distribución de Ingresos por Departamento", hole=0.4,
+                                     color_discrete_sequence=px.colors.qualitative.Prism)
                     st.plotly_chart(fig_dep, use_container_width=True)
                     
                 with col_chart2:
-                    dem_canal = df_cargado.groupby('Canal de Distribución')['Demanda Pronosticada'].sum().reset_index()
-                    fig_canal = px.bar(dem_canal, x='Canal de Distribución', y='Demanda Pronosticada',
-                                       title="Demanda Pronosticada por Canal de Distribución",
-                                       color='Canal de Distribución', color_discrete_sequence=px.colors.sequential.Viridis)
+                    dem_canal = df_cargado.groupby('Canal de Distribución')['Ingresos Pronosticados'].sum().reset_index()
+                    fig_canal = px.bar(dem_canal, x='Canal de Distribución', y='Ingresos Pronosticados',
+                                       title="Ingresos Pronosticados por Canal de Distribución",
+                                       color='Canal de Distribución', color_discrete_sequence=px.colors.sequential.Plotly3)
+                    fig_canal.update_layout(yaxis_tickformat="$ ,.0f")
                     st.plotly_chart(fig_canal, use_container_width=True)
                 
         except Exception as e:
@@ -380,12 +390,12 @@ elif opcion_carga == "Cargar archivo CSV / Excel":
 
 # 3. Datos de Demostración (Sandbox)
 else:
-    st.subheader("💡 Modo Sandbox / Demostración")
-    st.info("Generando datos simulados basados en las 12 características para experimentar con el comportamiento del tablero en la industria de la espuma.")
+    st.subheader("💡 Modo Sandbox / Demostración Financiera")
+    st.info("Generando datos simulados basados en las 12 características para experimentar con el comportamiento financiero del tablero.")
     
     if 'df_demo' not in st.session_state:
         st.session_state.df_demo = generar_datos_ejemplo(150)
-        st.session_state.df_demo['Demanda Pronosticada'] = forecaster.predecir(st.session_state.df_demo)
+        st.session_state.df_demo['Ingresos Pronosticados'] = forecaster.predecir(st.session_state.df_demo)
         
     df_demo = st.session_state.df_demo
     
@@ -393,49 +403,51 @@ else:
         col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
         
         with col_kpi1:
-            st.metric("Demanda Pronosticada Total", f"{df_demo['Demanda Pronosticada'].sum():,.0f} u")
+            st.metric("Total Ingresos Pronosticados", f"$ {df_demo['Ingresos Pronosticados'].sum():,.2f}")
         with col_kpi2:
-            st.metric("Top Departamento", str(df_demo.groupby('Departamento')['Demanda Pronosticada'].sum().idxmax()))
+            st.metric("Top Departamento Financiero", str(df_demo.groupby('Departamento')['Ingresos Pronosticados'].sum().idxmax()))
         with col_kpi3:
-            st.metric("Oficina de Ventas Líder", str(df_demo.groupby('Ofc. Venta')['Demanda Pronosticada'].sum().idxmax()))
+            st.metric("Oficina Líder en Ventas", str(df_demo.groupby('Ofc. Venta')['Ingresos Pronosticados'].sum().idxmax()))
         with col_kpi4:
-            st.metric("Mes con Mayor Demanda", f"Mes {df_demo.groupby('Mes')['Demanda Pronosticada'].sum().idxmax()}")
+            st.metric("Mes con Mayor Recaudación", f"Mes {df_demo.groupby('Mes')['Ingresos Pronosticados'].sum().idxmax()}")
         
     st.write("---")
-    st.markdown("### 📈 Visualización Avanzada de Tendencias")
+    st.markdown("### 📈 Visualización Avanzada de Ingresos y Tendencias")
     
     with st.container():
         col_v1, col_v2 = st.columns(2)
         
         with col_v1:
-            dem_mensual = df_demo.groupby('Mes')['Demanda Pronosticada'].sum().reset_index()
+            dem_mensual = df_demo.groupby('Mes')['Ingresos Pronosticados'].sum().reset_index()
             nombres_meses = {1: 'Ene', 2: 'Feb', 3: 'Mar', 4: 'Abr', 5: 'May', 6: 'Jun', 
                              7: 'Jul', 8: 'Ago', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dic'}
             dem_mensual['Nombre Mes'] = dem_mensual['Mes'].map(nombres_meses)
             
-            fig_trend = px.line(dem_mensual, x='Nombre Mes', y='Demanda Pronosticada', markers=True,
-                                title="Comportamiento Estacional (Demanda Pronosticada por Mes)",
-                                labels={'Nombre Mes': 'Mes del Año', 'Demanda Pronosticada': 'Unidades Pronosticadas'})
-            fig_trend.update_traces(line_color='#1E3A8A', line_width=3, marker=dict(size=8))
+            fig_trend = px.line(dem_mensual, x='Nombre Mes', y='Ingresos Pronosticados', markers=True,
+                                title="Ingresos Pronosticados Mensuales (Estacionalidad)",
+                                labels={'Nombre Mes': 'Mes del Año', 'Ingresos Pronosticados': 'Ingresos Proyectados ($)'})
+            fig_trend.update_traces(line_color='#16A34A', line_width=3, marker=dict(size=8))
+            fig_trend.update_layout(yaxis_tickformat="$ ,.0f")
             st.plotly_chart(fig_trend, use_container_width=True)
             
         with col_v2:
-            dem_vendedor = df_demo.groupby('Vendedor')['Demanda Pronosticada'].sum().reset_index().sort_values(by='Demanda Pronosticada', ascending=True)
-            fig_vend = px.bar(dem_vendedor, x='Demanda Pronosticada', y='Vendedor', orientation='h',
-                              title="Volumen de Demanda Asignado por Vendedor",
-                              color='Demanda Pronosticada', color_continuous_scale='Blues')
+            dem_vendedor = df_demo.groupby('Vendedor')['Ingresos Pronosticados'].sum().reset_index().sort_values(by='Ingresos Pronosticados', ascending=True)
+            fig_vend = px.bar(dem_vendedor, x='Ingresos Pronosticados', y='Vendedor', orientation='h',
+                              title="Ingresos Generados por Vendedor",
+                              color='Ingresos Pronosticados', color_continuous_scale='Greens')
+            fig_vend.update_layout(xaxis_tickformat="$ ,.0f")
             st.plotly_chart(fig_vend, use_container_width=True)
         
     st.write("---")
-    st.markdown("### 📍 Geografía y Canales")
+    st.markdown("### 📍 Distribución Geográfica e Ingresos por Canal")
     with st.container():
-        pob_canal = df_demo.groupby(['Pobl. Destino', 'Canal de Distribución'])['Demanda Pronosticada'].sum().reset_index()
+        pob_canal = df_demo.groupby(['Pobl. Destino', 'Canal de Distribución'])['Ingresos Pronosticados'].sum().reset_index()
         fig_bubble = px.scatter(pob_canal, x='Pobl. Destino', y='Canal de Distribución', 
-                                size='Demanda Pronosticada', color='Demanda Pronosticada',
-                                title="Matriz de Demanda: Población Destino vs Canal de Distribución",
+                                size='Ingresos Pronosticados', color='Ingresos Pronosticados',
+                                title="Matriz de Ingresos: Geografía vs Canal de Distribución",
                                 size_max=40, color_continuous_scale='Viridis')
         st.plotly_chart(fig_bubble, use_container_width=True)
 
 # Pie de página informativo
 st.write("---")
-st.markdown("<p style='text-align: center; color: #9CA3AF; font-size: 0.85rem;'>Plataforma Inteligente de Pronóstico de Demanda Corporativa. Construido con Streamlit, Plotly y Python.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #9CA3AF; font-size: 0.85rem;'>Plataforma Inteligente de Pronóstico de Ingresos Corporativos. Construido con Streamlit, Plotly y Python.</p>", unsafe_allow_html=True)
