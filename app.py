@@ -10,7 +10,7 @@ import traceback
 
 # Configuración inicial de la página (Debe ser la primera instrucción)
 st.set_page_config(
-    page_title="Predicción de Demanda Inteligente",
+    page_title="Predicción de Demanda - Productos de Espuma",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -75,53 +75,65 @@ class DemandForecaster:
         # Si tu modelo .pkl cargó exitosamente, intentamos predecir con él
         if not self.is_mock and self.model is not None:
             try:
-                # XGBoost suele requerir las columnas en el orden exacto de su entrenamiento.
-                # Seleccionamos las columnas clave que definiste.
+                # El modelo de XGBoost espera que le pasemos las variables con las que fue entrenado
                 columnas_modelo = [
                     'Vendedor', 'Ofc. Venta', 'Período contable', 'Pobl. Destino', 
                     'Canal de Distribución', 'Departamento', 'Mes'
                 ]
                 
-                # Ejemplo de conversión rápida a variables One-Hot Encoding (ajustar si tu modelo usa otro preprocesamiento)
+                # Conversión rápida a variables One-Hot Encoding
                 X = pd.get_dummies(df_processed[columnas_modelo], drop_first=True)
                 
                 # Realizar predicción
                 predicciones = self.model.predict(X)
                 return np.maximum(0, predicciones)  # Evitar demandas negativas
             except Exception as e:
-                # Si falla por diferencias de versiones o formato de columnas, usamos el motor inteligente
+                # Si falla por diferencias de columnas o entrenamiento, usamos el motor inteligente
                 print(f"[ERROR] Falló la predicción con el modelo real: {str(e)}. Utilizando simulación de respaldo.")
         
-        # --- MOTOR DE SIMULACIÓN INTELIGENTE DE RESPALDO (MOCK) ---
+        # --- MOTOR DE SIMULACIÓN INTELIGENTE DE RESPALDO (MOCK adaptado a Espumas) ---
         np.random.seed(42)
         predicciones = []
         
         for _, row in df_processed.iterrows():
-            base_demanda = 100.0
+            base_demanda = 120.0
             mes = int(row.get('Mes', 6))
-            estacionalidad = 1.0 + 0.3 * np.sin(2 * np.pi * mes / 12) + (0.5 if mes in [11, 12] else 0.0)
-            factor_canal = 1.2 if str(row.get('Canal de Distribución', '')).lower() in ['mayorista', 'online', 'directo'] else 0.9
+            # Estacionalidad (picos en temporada alta de colchones y confort: fin de año y mitad de año)
+            estacionalidad = 1.0 + 0.25 * np.sin(2 * np.pi * mes / 12) + (0.4 if mes in [11, 12, 6, 7] else 0.0)
+            
+            # Factores según canal
+            factor_canal = 1.3 if str(row.get('Canal de Distribución', '')).lower() in ['mayorista', 'distribuidor', 'directo fábrica'] else 0.9
             factor_vendedor = 1.0 + (len(str(row.get('Vendedor', ''))) % 5) * 0.05
-            factor_producto = 1.0 + (len(str(row.get('Descripción de material (producto)', ''))) % 10) * 0.1
+            
+            # Factor por tipo de material
+            factor_producto = 1.0 + (len(str(row.get('Descripción de material (producto)', ''))) % 10) * 0.08
             
             prediccion = base_demanda * estacionalidad * factor_canal * factor_vendedor * factor_producto
-            ruido = np.random.normal(0, prediccion * 0.05)
+            ruido = np.random.normal(0, prediccion * 0.04)
             
             predicciones.append(max(0, round(prediccion + ruido, 2)))
             
         return np.array(predicciones)
 
-def generar_datos_ejemplo(n_filas=100):
-    """Genera datos de ejemplo con las 12 columnas requeridas."""
+def generar_datos_ejemplo(n_filas=150):
+    """Genera datos de ejemplo representativos de la industria de espumas."""
     np.random.seed(42)
     
     vendedores = ['Vendedor Juan', 'Vendedora Maria', 'Vendedor Carlos', 'Vendedora Ana']
-    productos = ['Laptop Pro 15', 'Monitor UltraWide 34', 'Teclado Mecánico RGB', 'Mouse Ergonómico Inalámbrico', 'Silla Executive Grey']
-    solicitantes = ['Tech Corp S.A.', 'Global Solutions Inc.', 'Distribuidora Nova', 'Tiendas del Norte', 'Suministros Industriales']
+    productos = [
+        'Lámina de Espuma D30 (Alta Densidad)', 
+        'Bloque de Espuma Flexible PU', 
+        'Colchón Espuma Memoria Ortopédico', 
+        'Rollo de Espuma Protectora (Empaque)', 
+        'Placa de Espuma Acústica Aislante',
+        'Cojín de Espuma Ergonómico Semicircular',
+        'Lámina de Espuma D20 (Baja Densidad)'
+    ]
+    solicitantes = ['Muebles del Hogar S.A.', 'Colchonería El Ensueño', 'Empaques Industriales SAS', 'Distribuidora Confort', 'Suministros de Espuma S.A.']
     oficinas = ['Oficina Norte', 'Oficina Sur', 'Oficina Centro', 'Oficina Virtual']
-    poblaciones = ['Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena']
-    canales = ['Canal Directo', 'Distribuidor', 'E-Commerce', 'Retail']
-    departamentos = ['Tecnología', 'Oficina', 'Mobiliario', 'Accesorios']
+    poblaciones = ['Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Bucaramanga']
+    canales = ['Distribuidor', 'Directo Fábrica', 'E-Commerce', 'Retail']
+    departamentos = ['Colchonería', 'Espumas Industriales', 'Empaques', 'Hogar y Confort']
     
     fechas = pd.date_range(start='2025-01-01', end='2025-12-31', periods=n_filas)
     
@@ -130,7 +142,7 @@ def generar_datos_ejemplo(n_filas=100):
         'Fec Factura': fechas,
         'Nombre del solicitante': np.random.choice(solicitantes, n_filas),
         'Descripción de material (producto)': np.random.choice(productos, n_filas),
-        'Cantidad facturada': np.random.randint(5, 150, n_filas),
+        'Cantidad facturada': np.random.randint(10, 300, n_filas),
         'Ofc. Venta': np.random.choice(oficinas, n_filas),
         'Período contable': 2025,
         'Pobl. Destino': np.random.choice(poblaciones, n_filas),
@@ -195,12 +207,12 @@ else:
 
 opcion_carga = st.sidebar.radio(
     "Selecciona la fuente de datos:",
-    ["Simular registro único", "Cargar archivo CSV / Excel", "Usar datos de demostración"]
+    ["Simular registro único", "Cargar archivo CSV / Excel", "Usar datos de de demostración"]
 )
 
 # --- PANEL PRINCIPAL ---
-st.title("📈 Sistema Inteligente de Pronóstico de Demanda")
-st.caption("Optimiza tus niveles de inventario y toma decisiones comerciales basadas en datos e inteligencia artificial.")
+st.title("📈 Sistema Inteligente de Pronóstico de Demanda - Espumas")
+st.caption("Optimiza tus niveles de inventario y toma decisiones comerciales basadas en datos e inteligencia artificial para la industria de la espuma.")
 st.write("---")
 
 # 1. Opción Registro Único
@@ -213,8 +225,16 @@ if opcion_carga == "Simular registro único":
     with col1:
         vendedor = st.selectbox("Vendedor", ['Vendedor Juan', 'Vendedora Maria', 'Vendedor Carlos', 'Vendedora Ana'])
         fec_factura = st.date_input("Fecha Factura", datetime.today())
-        nombre_solicitante = st.text_input("Nombre del solicitante", "Cliente Premium S.A.")
-        producto = st.selectbox("Descripción de material (producto)", ['Laptop Pro 15', 'Monitor UltraWide 34', 'Teclado Mecánico RGB', 'Mouse Ergonómico Inalámbrico', 'Silla Executive Grey'])
+        nombre_solicitante = st.text_input("Nombre del solicitante", "Colchonería El Ensueño")
+        producto = st.selectbox("Descripción de material (producto)", [
+            'Lámina de Espuma D30 (Alta Densidad)', 
+            'Bloque de Espuma Flexible PU', 
+            'Colchón Espuma Memoria Ortopédico', 
+            'Rollo de Espuma Protectora (Empaque)', 
+            'Placa de Espuma Acústica Aislante',
+            'Cojín de Espuma Ergonómico Semicircular',
+            'Lámina de Espuma D20 (Baja Densidad)'
+        ])
     
     with col2:
         cantidad_facturada = st.number_input("Cantidad histórica facturada (referencia)", min_value=1, value=50)
@@ -223,9 +243,9 @@ if opcion_carga == "Simular registro único":
         poblacion_destino = st.text_input("Población Destino (Pobl. Destino)", "Bogotá")
         
     with col3:
-        canal_distribucion = st.selectbox("Canal de Distribución", ['Canal Directo', 'Distribuidor', 'E-Commerce', 'Retail'])
+        canal_distribucion = st.selectbox("Canal de Distribución", ['Distribuidor', 'Directo Fábrica', 'E-Commerce', 'Retail'])
         hora_facturacion = st.time_input("Hora de facturación", datetime.now().time())
-        departamento = st.selectbox("Departamento", ['Tecnología', 'Oficina', 'Mobiliario', 'Accesorios'])
+        departamento = st.selectbox("Departamento", ['Colchonería', 'Espumas Industriales', 'Empaques', 'Hogar y Confort'])
         mes = st.slider("Mes", min_value=1, max_value=12, value=int(datetime.today().month))
 
     # Crear dataframe con las 12 variables requeridas
@@ -257,25 +277,25 @@ if opcion_carga == "Simular registro único":
                 st.metric(
                     label="DEMANDA ESTIMADA", 
                     value=f"{prediccion_resultado:,.1f} Unidades",
-                    help="Unidades pronosticadas basadas en patrones estacionales y geográficos."
+                    help="Unidades de espuma pronosticadas basadas en patrones estacionales y geográficos."
                 )
                 
                 st.markdown(f"""
                     <div class="custom-card">
                         <h5>Estado del Pronóstico</h5>
                         <h2>Estable</h2>
-                        <p>Variabilidad estimada del ±5% según comportamiento de mercado.</p>
+                        <p>Variabilidad de pedido estimada del ±4% según comportamiento de mercado.</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
             with res_col2:
-                categorias_demostracion = ['Tecnología', 'Oficina', 'Mobiliario', 'Accesorios']
-                valores_comparativos = [prediccion_resultado if c == departamento else np.random.randint(20, 120) for c in categorias_demostracion]
+                categorias_demostracion = ['Colchonería', 'Espumas Industriales', 'Empaques', 'Hogar y Confort']
+                valores_comparativos = [prediccion_resultado if c == departamento else np.random.randint(50, 250) for c in categorias_demostracion]
                 
                 fig = px.bar(
                     x=categorias_demostracion,
                     y=valores_comparativos,
-                    labels={'x': 'Departamento', 'y': 'Demanda Prevista'},
+                    labels={'x': 'Departamento', 'y': 'Demanda Prevista (m³ / Unidades)'},
                     title=f"Predicción Comparativa por Categoría (Destacando {departamento})",
                     color=categorias_demostracion,
                     color_discrete_map={departamento: '#1E3A8A'}
@@ -332,7 +352,7 @@ elif opcion_carga == "Cargar archivo CSV / Excel":
             st.download_button(
                 label="📥 Descargar Reporte con Pronósticos en CSV",
                 data=csv_data,
-                file_name="pronosticos_demanda_procesado.csv",
+                file_name="pronosticos_demanda_espumas.csv",
                 mime="text/csv",
                 type="primary"
             )
@@ -361,7 +381,7 @@ elif opcion_carga == "Cargar archivo CSV / Excel":
 # 3. Datos de Demostración (Sandbox)
 else:
     st.subheader("💡 Modo Sandbox / Demostración")
-    st.info("Generando datos simulados basados en las 12 características para experimentar con el comportamiento del tablero.")
+    st.info("Generando datos simulados basados en las 12 características para experimentar con el comportamiento del tablero en la industria de la espuma.")
     
     if 'df_demo' not in st.session_state:
         st.session_state.df_demo = generar_datos_ejemplo(150)
